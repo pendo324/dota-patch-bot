@@ -6,19 +6,18 @@
     "target": "ESNext",
     "lib": ["es2020", "DOM"],
     "module": "esnext", // (A)
-    "moduleResolution": "node12", // (B)
+    "moduleResolution": "nodenext", // (B)
     "strict": true,
     "sourceMap": true,
-    // Needed for CommonJS modules
     "allowSyntheticDefaultImports": true, // (C)
-    //
     "declaration": true,
     "baseUrl": ".",
     "paths": {
-      "dotenv": ["node_modules/dotenv/types"],
+      "discord-api-types/v9": ["node_modules/discord-api-types/v9.d.ts"],
+      "dotenv": ["node_modules/dotenv/types/index.d.ts"],
+      "@discordjs/builders": ["node_modules/@discordjs/builders/dist/index.d.ts"],
       "node-schedule": ["node_modules/@types/node-schedule/index.d.ts"]
-    },
-    "types": []
+    }
   },
   "watchOptions": {
     // Use native file system events for files and directories
