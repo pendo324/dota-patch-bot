@@ -5,31 +5,19 @@
     "outDir": "dist",
     "target": "ESNext",
     "lib": ["es2020", "DOM"],
-    "module": "esnext", // (A)
-    "moduleResolution": "nodenext", // (B)
+    "module": "esnext",
+    "moduleResolution": "node",
     "strict": true,
     "sourceMap": true,
-    "allowSyntheticDefaultImports": true, // (C)
+    "allowSyntheticDefaultImports": true,
     "declaration": true,
-    "baseUrl": ".",
-    "paths": {
-      "discord-api-types/v9": ["node_modules/discord-api-types/v9.d.ts"],
-      "dotenv": ["node_modules/dotenv/types/index.d.ts"],
-      "@discordjs/builders": ["node_modules/@discordjs/builders/dist/index.d.ts"],
-      "node-schedule": ["node_modules/@types/node-schedule/index.d.ts"]
-    }
+    "baseUrl": "."
   },
   "watchOptions": {
-    // Use native file system events for files and directories
     "watchFile": "useFsEvents",
     "watchDirectory": "useFsEvents",
-    // Poll files for updates more frequently
-    // when they're updated a lot.
     "fallbackPolling": "dynamicPriority",
-    // Don't coalesce watch notification
     "synchronousWatchDirectory": true,
-    // Finally, two additional settings for reducing the amount of possible
-    // files to track  work from these directories
-    "excludeDirectories": ["**/node_modules", "**/dist"]
+    "excludeDirectories": ["**/node_modules", "**/dist", "**/data"]
   }
 }

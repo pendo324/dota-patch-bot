@@ -8,6 +8,27 @@ dotenv.config();
 const commands = [
   new SlashCommandBuilder().setName('ping').setDescription('Replies with pong!'),
   new SlashCommandBuilder()
+    .setName('set_channel')
+    .setDescription('Set which channel the bot will send patch updates')
+    .addChannelOption((option) =>
+      option.setName('channel').setDescription('Channel to use for patch updates').setRequired(true)
+    ),
+  new SlashCommandBuilder()
+    .setName('set_notification_role')
+    .setDescription('Set which channel the bot will send patch updates')
+    .addRoleOption((option) =>
+      option.setName('role').setDescription('Role to give users that subscribe to notifications').setRequired(true)
+    ),
+  new SlashCommandBuilder()
+    .setName('set_notification_emoji')
+    .setDescription('Set which emoji reaction will give users the notification role')
+    .addStringOption((option) =>
+      option
+        .setName('emoji')
+        .setDescription('Emoji that users should react with to get notifications')
+        .setRequired(true)
+    ),
+  new SlashCommandBuilder()
     .setName('patchinfo')
     .setDescription('Replies with patch info for a given patch. No patch arg defaults to the latest patch')
     .addStringOption((option) => option.setName('patch_number').setDescription('Enter a patch version'))

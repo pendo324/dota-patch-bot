@@ -2,8 +2,8 @@ import * as axios from 'axios';
 import { scheduleJob } from 'node-schedule';
 import { readFile, writeFile } from 'fs/promises';
 
-import { CachedPatch, PatchData, Patch } from './models.mjs';
-import { dirname } from './util/dirname.mjs';
+import { CachedPatch, PatchData, Patch } from '../models.mjs';
+import { dirname } from '../util/dirname.mjs';
 
 const cachedPatchesFileName = dirname(['../../', 'data', 'patchData.json']);
 let latestCachedPatchData: PatchData | undefined;
