@@ -160,13 +160,18 @@ client.on('interactionCreate', async (interaction) => {
       content: 'Notificaiton channel set. Sending message that will be used to add users to group now.'
     });
 
-    const message = await channel.send(
-      `React with ${
-        notificationRoleEmoji.animated === 1
-          ? formatEmoji(notificationRoleEmoji.emojiId, true)
-          : formatEmoji(notificationRoleEmoji.emojiId)
-      } to get notified when a new patch is released.`
-    );
+    let emojiString;
+    if (notificationRoleEmoji?.emojiName) {
+      if (notificationRoleEmoji.animated === 1) {
+        emojiString = formatEmoji(notificationRoleEmoji.emojiId, true);
+      } else {
+        emojiString = formatEmoji(notificationRoleEmoji.emojiId, false);
+      }
+    } else {
+      emojiString = notificationRoleEmoji.emojiId;
+    }
+
+    const message = await channel.send(`React with ${emojiString} to get notified when a new patch is released.`);
 
     message.react(notificationRoleEmoji.emojiId);
 
