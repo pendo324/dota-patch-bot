@@ -8,7 +8,7 @@ dotenv.config();
 const commands = [
   new SlashCommandBuilder().setName('ping').setDescription('Replies with pong!'),
   new SlashCommandBuilder()
-    .setName('set_channel')
+    .setName('set_notification_channel')
     .setDescription('Set which channel the bot will send patch updates')
     .addChannelOption((option) =>
       option.setName('channel').setDescription('Channel to use for patch updates').setRequired(true)

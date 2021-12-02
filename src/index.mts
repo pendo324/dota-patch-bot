@@ -1,18 +1,29 @@
 import * as dotenv from 'dotenv';
 
-dotenv.config();
-
 import { Client, Intents, TextChannel } from 'discord.js';
 import { formatEmoji } from '@discordjs/builders';
+
+dotenv.config();
 
 import { createPatchEmbed } from './createPatchEmbed.mjs';
 import { scheduleFetch } from './persist/patches.mjs';
 import { Patch } from './models.mjs';
-import { getNotificationChannel, setNotificationChannel } from './persist/notificationsChannel.mjs';
-import { getNotificationRole, setNotificationRole } from './persist/notificationRole.mjs';
-import { getMessageEmoji, getRoleMessage, setMessageEmoji, setRoleMessage } from './persist/roleMessage.mjs';
+
+import {
+  getNotificationsChannel,
+  insertNotificationsChannel,
+  getNotificationRole,
+  insertNotificationRole,
+  getRoleMessage,
+  insertRoleMessage,
+  getRoleMessageEmoji,
+  insertRoleMessageEmoji,
+  getAllNotificationsUsers,
+  clearNotificationsUsers,
+  getNotificationsUser
+} from './db/index.mjs';
+
 import { addUserRole, removeUserRole } from './userRoles.mjs';
-import { getNotificationUsers, clearNotificationUsers } from './persist/notificationUsers.mjs';
 
 const client = new Client({
   intents: [
@@ -24,7 +35,7 @@ const client = new Client({
 });
 
 const onNewPatch = async (newPatch: Patch) => {
-  const { notificationChannel } = await getNotificationChannel();
+  const notificationChannel = getNotificationsChannel();
 
   const { embed } = await createPatchEmbed({
     patchName: newPatch.patch_name,
@@ -32,7 +43,7 @@ const onNewPatch = async (newPatch: Patch) => {
   });
 
   if (notificationChannel?.channelId) {
-    const channel = client.channels.cache.get(notificationChannel.channelId);
+    const channel = client.channels.cache.get(notificationChannel?.channelId);
     if (channel) {
       if (channel.isText()) {
         channel.send({ embeds: [embed] });
@@ -47,29 +58,27 @@ const latestPatch = patchData.patches.at(-1);
 
 client.on('ready', async () => {
   console.log(`Logged in as ${client?.user?.tag}!`);
-  const { notificationChannel } = await getNotificationChannel();
-  const { roleMessage } = await getRoleMessage();
-  const { roleMessageEmoji } = await getMessageEmoji();
-  const { notificationUsers } = await getNotificationUsers();
+  const notificationsChannel = getNotificationsChannel();
+  const roleMessage = getRoleMessage();
+  const roleMessageEmoji = getRoleMessageEmoji();
 
-  if (notificationChannel && roleMessageEmoji && roleMessage) {
-    const channel = client.channels.cache.get(notificationChannel.channelId);
+  if (notificationsChannel?.channelId && roleMessage?.messageId && roleMessageEmoji?.emojiId) {
+    const channel = client.channels.cache.get(notificationsChannel?.channelId);
     if (channel) {
       if (channel.isText()) {
-        const message = await channel.messages.fetch(roleMessage.messageId);
+        const message = await channel.messages.fetch(roleMessage?.messageId);
         for (const [_reactionId, reaction] of message.reactions.cache) {
-          console.log(reaction.emoji.name);
           if (reaction.emoji.id === roleMessageEmoji?.emojiId) {
             await reaction.users.fetch();
+            const notificationUsers = getAllNotificationsUsers();
             for (const [_userId, user] of reaction.users.cache) {
               const member = await reaction.message.guild?.members.fetch(user);
-              if (member) {
+              if (member && !getNotificationsUser({ id: user.id })) {
                 addUserRole(member);
               }
             }
-            console.log(notificationUsers);
-            if (notificationUsers?.users) {
-              for (const cachedUser of notificationUsers?.users) {
+            if (notificationUsers) {
+              for (const cachedUser of notificationUsers) {
                 const realUser = reaction.users.resolve(cachedUser.userId);
                 if (!realUser) {
                   const member = await reaction.message.guild?.members.fetch(cachedUser.userId);
@@ -80,11 +89,11 @@ client.on('ready', async () => {
               }
             }
           } else {
-            await clearNotificationUsers();
+            clearNotificationsUsers();
           }
         }
         if (!message.reactions.cache.size) {
-          await clearNotificationUsers();
+          clearNotificationsUsers();
         }
       }
     }
@@ -121,8 +130,7 @@ client.on('interactionCreate', async (interaction) => {
       });
     }
 
-    const { notificationRole } = await getNotificationRole();
-    const { roleMessageEmoji } = await getMessageEmoji();
+    const notificationRole = getNotificationRole();
     if (!notificationRole) {
       return await interaction.reply({
         ephemeral: true,
@@ -130,14 +138,15 @@ client.on('interactionCreate', async (interaction) => {
       });
     }
 
-    if (!roleMessageEmoji) {
+    const notificationRoleEmoji = getRoleMessageEmoji();
+    if (!notificationRoleEmoji) {
       return await interaction.reply({
         ephemeral: true,
         content: 'The notification role emoji the set_notification_emoji command before using the set_channel command.'
       });
     }
 
-    await setNotificationChannel({
+    insertNotificationsChannel({
       notificationChannel: {
         channelId: patchChannel.id,
         channelName: patchChannel.name
@@ -151,9 +160,17 @@ client.on('interactionCreate', async (interaction) => {
       content: 'Notificaiton channel set. Sending message that will be used to add users to group now.'
     });
 
-    const message = await channel.send('React with this role to get notified when a new patch is released.');
+    const message = await channel.send(
+      `React with ${
+        notificationRoleEmoji.animated === 1
+          ? formatEmoji(notificationRoleEmoji.emojiId, true)
+          : formatEmoji(notificationRoleEmoji.emojiId)
+      } to get notified when a new patch is released.`
+    );
 
-    await setRoleMessage({
+    message.react(notificationRoleEmoji.emojiId);
+
+    insertRoleMessage({
       roleMessage: {
         messageId: message.id
       }
@@ -161,7 +178,7 @@ client.on('interactionCreate', async (interaction) => {
   } else if (commandName === 'set_notification_role') {
     const notificationRole = interaction.options.getRole('role')!;
 
-    await setNotificationRole({
+    insertNotificationRole({
       notificationRole: {
         roleId: notificationRole.id,
         roleName: notificationRole.name
@@ -174,20 +191,26 @@ client.on('interactionCreate', async (interaction) => {
     const emoteRegex = /<(?<animated>a)?:(?<emojiName>.+):(?<emojiId>\d+)>/;
     const emoteMatches = emojiString.match(emoteRegex);
 
-    if (emoteMatches) {
-      const emojiName = emoteMatches?.groups?.['emojiName'] as string | undefined;
-      const emojiId = emoteMatches?.groups?.['emojiId'] as string | undefined;
-      const animated = emoteMatches?.groups?.['animated'] ? true : false;
-      if (emojiName && emojiId) {
+    const emojiRegex = /(?<emojiId>\p{Emoji_Presentation}|\p{Extended_Pictographic})/u;
+    const emojiMatches = emojiString.match(emojiRegex);
+
+    const emoteOrEmoji = emoteMatches ?? emojiMatches;
+
+    if (emoteOrEmoji) {
+      const emojiName = emoteOrEmoji?.groups?.['emojiName'] as string | undefined;
+      const emojiId = emoteOrEmoji?.groups?.['emojiId'] as string | undefined;
+      const animated = emoteOrEmoji?.groups?.['animated'] ? true : false;
+      if ((emojiName && emojiId) || (emojiMatches && emojiId)) {
         const emojiString = animated ? formatEmoji(emojiId, true) : formatEmoji(emojiId);
         interaction.reply({
           ephemeral: true,
           content: `Emoji set to ${emojiString}. set_channel command will now work.`
         });
-        return await setMessageEmoji({
+        return insertRoleMessageEmoji({
           roleMessageEmoji: {
             emojiId,
-            emojiName
+            emojiName,
+            animated: animated ? 1 : 0
           }
         });
       }
@@ -201,34 +224,40 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 client.on('messageReactionAdd', async (reaction, user) => {
-  const { notificationChannel } = await getNotificationChannel();
-  const { roleMessage } = await getRoleMessage();
-  const { roleMessageEmoji } = await getMessageEmoji();
+  const notificationsChannel = getNotificationsChannel();
+  const roleMessage = getRoleMessage();
+  const roleMessageEmoji = getRoleMessageEmoji();
 
-  if (notificationChannel && roleMessageEmoji && roleMessage && !user.partial) {
-    if (reaction.message.id === roleMessage?.messageId) {
-      if (reaction.emoji.id === roleMessageEmoji?.emojiId) {
-        const member = await reaction.message.guild?.members.fetch(user);
-        if (member) {
-          addUserRole(member);
-        }
+  if (notificationsChannel?.channelId && roleMessage?.messageId && roleMessageEmoji?.emojiId && !user.partial) {
+    if (
+      reaction.message.id === roleMessage.messageId &&
+      ((reaction.emoji.id && reaction.emoji.id === roleMessageEmoji?.emojiId) ||
+        reaction.emoji.name === roleMessageEmoji?.emojiId) &&
+      reaction.message.channelId === notificationsChannel.channelId
+    ) {
+      const member = await reaction.message.guild?.members.fetch(user);
+      if (member) {
+        addUserRole(member);
       }
     }
   }
 });
 
 client.on('messageReactionRemove', async (reaction, user) => {
-  const { notificationChannel } = await getNotificationChannel();
-  const { roleMessage } = await getRoleMessage();
-  const { roleMessageEmoji } = await getMessageEmoji();
+  const notificationsChannel = getNotificationsChannel();
+  const roleMessage = getRoleMessage();
+  const roleMessageEmoji = getRoleMessageEmoji();
 
-  if (notificationChannel && roleMessageEmoji && roleMessage && !user.partial) {
-    if (reaction.message.id === roleMessage?.messageId) {
-      if (reaction.emoji.id === roleMessageEmoji?.emojiId) {
-        const member = await reaction.message.guild?.members.fetch(user);
-        if (member) {
-          removeUserRole(member);
-        }
+  if (notificationsChannel?.channelId && roleMessage?.messageId && roleMessageEmoji?.emojiId && !user.partial) {
+    if (
+      reaction.message.id === roleMessage.messageId &&
+      ((reaction.emoji.id && reaction.emoji.id === roleMessageEmoji?.emojiId) ||
+        reaction.emoji.name === roleMessageEmoji?.emojiId) &&
+      reaction.message.channelId === notificationsChannel.channelId
+    ) {
+      const member = await reaction.message.guild?.members.fetch(user);
+      if (member) {
+        removeUserRole(member);
       }
     }
   }

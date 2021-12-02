@@ -3,7 +3,7 @@ import { MessageEmbed } from 'discord.js';
 import { roleMention, time } from '@discordjs/builders';
 
 import { PatchInfo } from './models.mjs';
-import { getNotificationRole } from './persist/notificationRole.mjs';
+import { getNotificationRole } from './db/index.mjs';
 
 const patchUrlPrefix = `https://www.dota2.com/datafeed/patchnotes?version=`;
 
@@ -44,7 +44,7 @@ export const createPatchEmbed = async ({
     );
 
   if (shouldMentionRole) {
-    const { notificationRole } = await getNotificationRole();
+    const notificationRole = await getNotificationRole();
     if (notificationRole?.roleId) {
       embed.setAuthor(roleMention(notificationRole.roleId));
     }
