@@ -16,4 +16,4 @@ COPY --from=build /usr/src/app/node_modules node_modules
 COPY --from=build /usr/src/app/dist dist
 RUN mkdir data
 
-RUN npm run start
+CMD ["npm", "run", "start"]
