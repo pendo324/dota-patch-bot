@@ -10,7 +10,8 @@
   "scripts": {
     "build": "tsc",
     "dev-server": "tsc-watch -p ./tsconfig.json --noClear --onSuccess \"node ./dist/index.mjs\"",
-    "register-commands": "node dist/register-commands.mjs",
+    "register-test-commands": "node dist/register-commands.mjs",
+    "register-global-commands": "node dist/register-commands.mjs --mode global",
     "start": "node dist/index.mjs",
     "watch": "tsc -w"
   },

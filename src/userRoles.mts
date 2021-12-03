@@ -1,19 +1,19 @@
 import { GuildMember } from 'discord.js';
 
-import { getNotificationRole, insertNotificationsUser, removeNotificationsUser } from './db/index.mjs';
+import { getNotificationsChannel, getNotificationRole, NotificationChannel } from './db/index.mjs';
 
-export const addUserRole = async (member: GuildMember) => {
-  const notificationsRole = getNotificationRole();
+export const addUserRole = async (member: GuildMember, notificationsChannel: NotificationChannel) => {
+  const notificationsRole = getNotificationRole({ channelId: notificationsChannel.channelId });
   if (notificationsRole) {
     member.roles.add(notificationsRole.roleId);
-    insertNotificationsUser({ notificationUser: { userId: member.user.id } });
   }
+  // insertNotificationsUser({ notificationUser: { userId: member.user.id } });
 };
 
-export const removeUserRole = async (member: GuildMember) => {
-  const notificationsRole = getNotificationRole();
+export const removeUserRole = async (member: GuildMember, notificationsChannel: NotificationChannel) => {
+  const notificationsRole = getNotificationRole({ channelId: notificationsChannel.channelId });
   if (notificationsRole) {
     member.roles.remove(notificationsRole.roleId);
-    removeNotificationsUser({ id: member.user.id });
   }
+  // removeNotificationsUser({ id: member.user.id });
 };

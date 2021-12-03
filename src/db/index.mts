@@ -5,25 +5,34 @@ import { dirname } from '../util/dirname.mjs';
 const databaseFileName = dirname(['../../', 'data', 'db.sqlite3']);
 export const db: IDatabase = new Database(databaseFileName);
 
-const createNotificationRolesTableStatement = `create table if not exists notification_roles('roleId' varchar, 'roleName' varchar);`;
+const createNotificationRolesTableStatement = `create table if not exists notification_roles('roleId' varchar, 'roleName' varchar, 'channelId' varchar, unique('roleId', 'channelId'));`;
 const createNotificationChannelsTableStatement = `create table if not exists notification_channels('channelId' varchar, 'channelName' varchar);`;
-const createNotificationUsersTableStatement = `create table if not exists notification_users('userId' varchar);`;
-const createRoleMessageTableStatement = `create table if not exists role_message('messageId' varchar);`;
-const createRoleMessageEmojiTableStatement = `create table if not exists role_message_emoji('emojiId' varchar, 'emojiName' varchar, 'animated' boolean);`;
+const createRoleMessageTableStatement = `create table if not exists role_message('messageId' varchar, 'channelId' varchar, unique('messageId', 'channelId'));`;
+const createRoleMessageEmojiTableStatement = `create table if not exists role_message_emoji('emojiId' varchar, 'emojiName' varchar, 'animated' boolean, 'messageId' varchar, unique('emojiId', 'messageId'));`;
 
 db.exec(createNotificationRolesTableStatement);
 db.exec(createNotificationChannelsTableStatement);
-db.exec(createNotificationUsersTableStatement);
 db.exec(createRoleMessageTableStatement);
 db.exec(createRoleMessageEmojiTableStatement);
 
-export interface IdQueryProps {
+export interface GetWithId {
   id?: string;
 }
+
+export interface GetWithMessageId {
+  id?: string;
+  messageId: string;
+}
+
+export type GetWithChannelId = {
+  id?: string;
+  channelId: string;
+};
 
 export interface NotificationRole {
   roleId: string;
   roleName: string;
+  channelId: string;
 }
 
 export interface NotificationRoleProps {
@@ -31,7 +40,12 @@ export interface NotificationRoleProps {
 }
 
 export const insertNotificationRole = (props: NotificationRoleProps) => {
-  const query: IStatement = db.prepare('insert into notification_roles (roleId, roleName) values (@roleId, @roleName)');
+  const query: IStatement = db.prepare(
+    `insert into notification_roles (roleId, roleName, channelId)
+    values (@roleId, @roleName, @channelId)
+    on conflict (roleId, channelId)
+    do update set roleId = @roleId, roleName = @roleName`
+  );
 
   const res = query.run({ ...props.notificationRole });
   if (res.changes) {
@@ -40,15 +54,19 @@ export const insertNotificationRole = (props: NotificationRoleProps) => {
   throw 'Notification role could not be inserted.';
 };
 
-export const getNotificationRole = (props?: IdQueryProps): NotificationRole | undefined => {
-  const queryById: IStatement = db.prepare('select roleId, roleName from notification_roles where roleId = @id');
-  const queryFirst: IStatement = db.prepare('select roleId, roleName from notification_roles limit 1');
+export const getNotificationRole = (props: GetWithChannelId): NotificationRole | undefined => {
+  const queryById: IStatement = db.prepare(
+    'select roleId, roleName, channelId from notification_roles where roleId = @id and channelId = @channelId'
+  );
+  const queryFirst: IStatement = db.prepare(
+    'select roleId, roleName from notification_roles where channelId = @channelId limit 1'
+  );
 
   if (props?.id) {
-    const res = queryById.get({ id: props?.id });
+    const res = queryById.get({ id: props?.id, channelId: props.channelId });
     return res as NotificationRole;
   }
-  const res = queryFirst.get();
+  const res = queryFirst.get({ channelId: props?.channelId });
   return res as NotificationRole;
 };
 
@@ -63,7 +81,8 @@ export interface NotificationChannelProps {
 
 export const insertNotificationsChannel = (props: NotificationChannelProps) => {
   const query: IStatement = db.prepare(
-    'insert into notification_channels (channelId, channelName) values (@channelId, @channelName)'
+    `insert into notification_channels (channelId, channelName)
+    values (@channelId, @channelName)`
   );
 
   const res = query.run({ ...props.notificationChannel });
@@ -73,7 +92,7 @@ export const insertNotificationsChannel = (props: NotificationChannelProps) => {
   throw 'Notification role could not be inserted.';
 };
 
-export const getNotificationsChannel = (props?: IdQueryProps): NotificationChannel | undefined => {
+export const getNotificationsChannel = (props?: GetWithChannelId): NotificationChannel | undefined => {
   const queryById: IStatement = db.prepare(
     'select channelId, channelName from notification_channels where channelId = @id'
   );
@@ -87,55 +106,15 @@ export const getNotificationsChannel = (props?: IdQueryProps): NotificationChann
   return res as NotificationChannel;
 };
 
-export interface NotificationUser {
-  userId: string;
-}
+export const getAllNotificationsChannels = (): NotificationChannel[] => {
+  const queryAll: IStatement = db.prepare('select channelId, channelName from notification_channels');
 
-export interface NotificationUserProp {
-  notificationUser: NotificationUser;
-}
-
-export const insertNotificationsUser = (props: NotificationUserProp) => {
-  const query: IStatement = db.prepare('insert into notification_users (userId) values (@userId)');
-
-  const res = query.run({ ...props.notificationUser });
-  if (res.changes) {
-    return;
-  }
-  throw 'Notification role could not be inserted.';
-};
-
-export const clearNotificationsUsers = () => {
-  const query: IStatement = db.prepare('delete from notification_users');
-  query.run();
-};
-
-export const getAllNotificationsUsers = (): NotificationUser[] | undefined => {
-  const query: IStatement = db.prepare('select userId from notification_users');
-
-  const res = query.all();
-  return res as NotificationUser[];
-};
-
-export const getNotificationsUser = ({ id }: IdQueryProps): NotificationUser | undefined => {
-  const queryById: IStatement = db.prepare('select userId from notification_users where userId = @id');
-
-  const res = queryById.get({ id });
-  return res as NotificationUser;
-};
-
-export const removeNotificationsUser = ({ id }: IdQueryProps) => {
-  const query: IStatement = db.prepare('delete from notification_users where userId = @id');
-
-  const res = query.run({ id });
-  if (res.changes) {
-    return;
-  }
-  throw 'Notification user could not be removed.';
+  return queryAll.all() as NotificationChannel[];
 };
 
 export interface RoleMessage {
   messageId: string;
+  channelId: string;
 }
 
 export interface RoleMessageProps {
@@ -143,7 +122,12 @@ export interface RoleMessageProps {
 }
 
 export const insertRoleMessage = (props: RoleMessageProps) => {
-  const query: IStatement = db.prepare('insert into role_message (messageId) values (@messageId)');
+  const query: IStatement = db.prepare(
+    `insert into role_message (messageId, channelId)
+    values (@messageId, @channelId)
+    on conflict (messageId, channelId)
+    do update set messageId = @messageId`
+  );
 
   const res = query.run({ ...props.roleMessage });
   if (res.changes) {
@@ -152,15 +136,19 @@ export const insertRoleMessage = (props: RoleMessageProps) => {
   throw 'Notification role message could not be inserted.';
 };
 
-export const getRoleMessage = (props?: IdQueryProps): RoleMessage | undefined => {
-  const queryById: IStatement = db.prepare('select messageId from role_message where messageId = @id');
-  const queryFirst: IStatement = db.prepare('select messageId from role_message limit 1');
+export const getRoleMessage = (props: GetWithChannelId): RoleMessage => {
+  const queryById: IStatement = db.prepare(
+    'select messageId, channelId from role_message where messageId = @id and channelId = @channelId'
+  );
+  const queryFirst: IStatement = db.prepare(
+    'select messageId, channelId from role_message where channelId = @channelId limit 1'
+  );
 
   if (props?.id) {
-    const res = queryById.get({ id: props?.id });
+    const res = queryById.get({ id: props?.id, channelId: props?.channelId });
     return res as RoleMessage;
   }
-  const res = queryFirst.get();
+  const res = queryFirst.get({ channelId: props?.channelId });
   return res as RoleMessage;
 };
 
@@ -168,6 +156,7 @@ export interface RoleMessageEmoji {
   emojiId: string;
   emojiName?: string;
   animated: number;
+  messageId: string;
 }
 
 export interface RoleMessageEmojiProps {
@@ -176,7 +165,10 @@ export interface RoleMessageEmojiProps {
 
 export const insertRoleMessageEmoji = (props: RoleMessageEmojiProps) => {
   const query: IStatement = db.prepare(
-    'insert into role_message_emoji (emojiId, emojiName, animated) values (@emojiId, @emojiName, @animated)'
+    `insert into role_message_emoji (emojiId, emojiName, animated, messageId)
+    values (@emojiId, @emojiName, @animated, @messageId)
+    on conflict (emojiId, messageId)
+    do update set emojiId = @emojiId, emojiName = @emojiName, animated = @animated`
   );
 
   const res = query.run({
@@ -189,16 +181,18 @@ export const insertRoleMessageEmoji = (props: RoleMessageEmojiProps) => {
   throw 'Notification role emoji could not be inserted.';
 };
 
-export const getRoleMessageEmoji = (props?: IdQueryProps): RoleMessageEmoji | undefined => {
+export const getRoleMessageEmoji = (props: GetWithMessageId): RoleMessageEmoji | undefined => {
   const queryById: IStatement = db.prepare(
-    'select emojiId, emojiName, animated from role_message_emoji where emojiId = @id'
+    'select emojiId, emojiName, animated, messageId from role_message_emoji where emojiId = @id and messageId = @messageId'
   );
-  const queryFirst: IStatement = db.prepare('select emojiId, emojiName, animated from role_message_emoji limit 1');
+  const queryFirst: IStatement = db.prepare(
+    'select emojiId, emojiName, animated, messageId from role_message_emoji where messageId = @messageId limit 1'
+  );
 
   if (props?.id) {
-    const res = queryById.get({ id: props?.id });
+    const res = queryById.get({ id: props?.id, messageId: props.messageId });
     return res as RoleMessageEmoji;
   }
-  const res = queryFirst.get();
+  const res = queryFirst.get({ messageId: props.messageId });
   return res as RoleMessageEmoji;
 };
