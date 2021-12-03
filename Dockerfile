@@ -15,6 +15,6 @@ COPY package*.json ./
 COPY --from=build /usr/src/app/node_modules node_modules
 COPY --from=build /usr/src/app/dist dist
 RUN mkdir data
-VOLUME ["/data"]
+VOLUME ["data/"]
 
 CMD ["npm", "run", "start"]
