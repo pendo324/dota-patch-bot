@@ -111,7 +111,7 @@ client.on('interactionCreate', async (interaction) => {
     } else {
       await interaction.reply('Valve API down. Try again later.');
     }
-  } else if (commandName === 'create_notification') {
+  } else if (commandName === 'create_patch_notification') {
     const patchChannel = interaction.options.getChannel('channel')!;
     const notificationRole = interaction.options.getRole('role')!;
 
