@@ -1,8 +1,15 @@
+import { existsSync, mkdirSync } from 'fs';
+
 import Database from 'better-sqlite3';
 import type { Database as IDatabase, Statement as IStatement } from 'better-sqlite3';
 import { dirname } from '../util/dirname.mjs';
 
-const databaseFileName = dirname(['../../', 'data', 'db.sqlite3']);
+const databaseFolderPathParts = ['../../', 'data'];
+const dataDirPath = dirname(databaseFolderPathParts);
+if (!existsSync(dataDirPath)) {
+  mkdirSync(dataDirPath);
+}
+const databaseFileName = dirname([...databaseFolderPathParts, 'db.sqlite3']);
 export const db: IDatabase = new Database(databaseFileName);
 
 const createNotificationRolesTableStatement = `create table if not exists notification_roles('roleId' varchar, 'roleName' varchar, 'channelId' varchar, unique('roleId', 'channelId'));`;
